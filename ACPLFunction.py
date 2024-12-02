@@ -129,7 +129,7 @@ def getevals(pgn,timepermove=0.5): # All evals are from the perspective of white
                 print(evals)
             #print('\n\n\n\n\n\n')
     return evals
-def getascpl(pgn,enginetime=0.5): #Retuns whites acpl, blacks acpl and then the cpl per move for white, and cpl for move for black
+def getascpl(pgn,enginetime=0.5,max_loss=1000): #Retuns whites acpl, blacks acpl and then the cpl per move for white, and cpl for move for black
     cplsW = []
     cplsB = []
     evalsW = getevals(pgn,timepermove=enginetime)
@@ -140,11 +140,15 @@ def getascpl(pgn,enginetime=0.5): #Retuns whites acpl, blacks acpl and then the 
         cpl = min(evalsB[i]-evalsB[i-1],0)
         if Logging:
             print(evalsB[i],evalsB[i-1],cpl)
+        if cpl < -max_loss:
+            cpl = -max_loss
         cplsB.append(cpl)
     for i in range(2,len(evalsW)-1,2):
         cpl = min(evalsW[i]-evalsW[i-1],0)
         if Logging:
             print(evalsW[i],evalsW[i-1],cpl)
+        if cpl < -max_loss:
+            cpl = -max_loss
         cplsW.append(cpl)
     Bsum = 0
     for item in cplsB:
