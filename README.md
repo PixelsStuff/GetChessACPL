@@ -5,7 +5,9 @@ First, change the 'stockfish_path' to the path of stockfish that you can downloa
 
 # Use of main function- getascpl(): 
 Input of this function is a PGN, and the time per move an engine spends time thinking(deault is 0.5)
+
 Output -> (WhitesACPL, BlacksACPL, list of CPL per move for white, list of CPL peer move for black) 
+
 To test this out, you can try adding print(getacpl(ExamplePGN))
 
 # Use of other functions:
