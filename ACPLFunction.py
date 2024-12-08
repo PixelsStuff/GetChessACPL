@@ -5,61 +5,35 @@ import time
 import chess.pgn
 import io
 import re
+import asyncio
 
 #SETTINGS#
-stockfish_path = '/Users/[yourusername]]/engines/stockfish' #Change this to your own stockfish path
+stockfish_path = '/Users/[user]]/stockfish' #Change this to your own stockfish path
 Logging = False 
 
 ExamplePGN = '''
-[Event "Live Chess"]
-[Site "Chess.com"]
-[Date "2024.11.26"]
-[Round "-"]
-[White "Wins"]
-[Black "Abandonad"]
-[Result "1-0"]
-[Timezone "UTC"]
-[ECO "A13"]
-[ECOUrl "https://www.chess.com/openings/English-Opening-Agincourt-Defense-2.Nf3"]
-[UTCDate "2024.11.26"]
-[UTCTime "18:57:16"]
-[WhiteElo "1982"]
-[BlackElo "1979"]
-[TimeControl "60"]
-[Termination "Wins won on time"]
-[StartTime "18:57:16"]
-[EndDate "2024.11.26"]
-[EndTime "18:59:27"]
+e4 d6 2. d4 Nf6 3. Nc3 g6 4. Nf3 Bg7 5. Bd3 Bg4 6. h3 Bxf3 7. Qxf3 Nc6 8. Ne2 e5 9. d5 Nd4 10. Qg3 Nxc2+ 11. Bxc2 Nh5 12. Qb3 b6 13. Qb5+ Qd7 14. Qxd7+ Kxd7 15. Ba4+ Ke7 16. Bc6 Rab8 17. O-O Rhd8 18. Bg5+ f6 19. Be3 Kf8 20. g4 Nf4 21. Nxf4 exf4 22. Bxf4 f5 23. exf5 gxf5 24. f3 fxg4 25. fxg4 Bxb2 26. Be5+ Kg8 27. Bxb2 Rf8 28. Rxf8+ Rxf8 29. Rf1 Rxf1+ 30. Kxf1 Kf7 31. Kf2 Kg6 32. Kf3 Kg5 33. Bg7 Kg6 34. Bf8 Kf7 35. Bh6 Kg6 36. Bf4 Kf7 37. Kg3 Kg6 38. Kh4 Kf7 39. Kh5 Kf6 40. Bg5+ Kf7 41. Bd8 Kg7 42. Bxc7 Kf6 43. Bxd6 Kg7 44. Bb8 Kf7 45. Bxa7'''
 
-1. Nf3 e6 2. c4 Ne7 $6 3. d4 b6 $6 4. Nc3 Bb7 $6 5. e4 d5 $2 6. e5 $2 Nbc6 7. cxd5 Nxd5
-8. Bb5 a6 9. Bd3 Qd7 $6 10. O-O O-O-O 11. a4 $2 Kb8 $6 12. Rb1 $2 f6 $6 13. Bd2 $6 fxe5 $2
-14. Nxe5 $4 Nxe5 15. dxe5 Qc6 $9 16. Be4 $6 Qc4 $9 17. Nxd5 $4 Qxe4 $1 18. Ne3 Bc5 19.
-Qe2 Bxe3 20. fxe3 Rd5 $6 21. Bc3 Rhd8 $9 22. Rf2 $4 Rd3 $9 23. Rbf1 Rxe3 24. Qd2 $2
-Rxd2 25. Rxd2 Rd3 26. Rdf2 h5 27. h3 h4 28. Rf3 Rxf3 29. Rxf3 Qe2 30. Rf2 Qe3
-31. Kf1 g5 32. Rf8+ Ka7 33. Rf3 1-0'''
-
-def analyze_position(fen: str, time_limit=0.5 ,stockfish_path=stockfish_path):
+async def analyze_position(fen: str, time_limit=0.5, stockfish_path=stockfish_path):
     """
-    Analyzes a chess position using Stockfish.
-
-    Args:
-        fen (str): The FEN string representing the board position
-        time_limit (float): Time in seconds for Stockfish to analyze the position. I set this to 1 second by default.
-        stockfish_path (str): Path to the Stockfish - should be done automatically from this file
-        
-
-    Returns:
-        tuple: A tuple containing the evaluation (`chess.engine.PovScore`) and the best move (`chess.Move`).
+    Asynchronously analyzes a chess position using Stockfish.
     """
-    # Set up the board from the FEN string
     board = chess.Board(fen)
     
-    # Start Stockfish
+    # Use asyncio's run_in_executor for the synchronous call
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,  # None uses the default ThreadPoolExecutor
+        lambda: _analyze_sync(board, time_limit, stockfish_path)
+    )
+    return result
+def _analyze_sync(board, time_limit, stockfish_path):
+    """
+    Helper function to run Stockfish analysis synchronously.
+    """
     with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
         try:
-            # Analyze the position
             result = engine.analyse(board, chess.engine.Limit(time=time_limit))
-            # Extract evaluation and best move
             evaluation = result['score']
             best_move = result['pv'][0]
             return evaluation, best_move
@@ -108,31 +82,37 @@ def phrase_stockfish_score(response,maxeval = 2500):
             if Logging:
                 print("Invalid response or game has ended")
         return None
-def getevals(pgn,timepermove=0.5): # All evals are from the perspective of white
+async def getevals(pgn,timepermove=0.5): # All evals are from the perspective of white
     evals = []
     board = chess.Board()
     pgn_io = io.StringIO(pgn)
     pgn = chess.pgn.read_game(pgn_io)
+    tasks = []
     for move in pgn.mainline_moves():
         board.push(move)
         fen = board.fen()
-        eval = phrase_stockfish_score(str(analyze_position(fen,time_limit=timepermove)))
-        if eval != None:
-            if eval[1] == 'BLACK':
-                eval = -eval[0]
-            else:
-                 eval = eval[0]
-            if Logging:
-                print(board,eval,move)
-            evals.append(eval)
-            if Logging:
-                print(evals)
+        tasks.append(analyze_position(fen, time_limit=timepermove))
+        #eval = phrase_stockfish_score(str(analyze_position(fen,time_limit=timepermove)))
+    results = await asyncio.gather(*tasks)
+    for result in results:
+        if result:
+            eval = phrase_stockfish_score(str(result))
+            if eval != None:
+                    if eval[1] == 'BLACK':
+                        eval = -eval[0]
+                    else:
+                        eval = eval[0]
+                    if Logging:
+                        print(board,eval,move)
+                    evals.append(eval)
+                    if Logging:
+                        print(evals)
             #print('\n\n\n\n\n\n')
     return evals
-def getascpl(pgn,enginetime=0.5,max_loss=1000): #Retuns whites acpl, blacks acpl and then the cpl per move for white, and cpl for move for black
+async def getascpl(pgn,enginetime=0.5,cap=1000): #Retuns whites acpl, blacks acpl and then the cpl per move for white, and cpl for move for black
     cplsW = []
     cplsB = []
-    evalsW = getevals(pgn,timepermove=enginetime)
+    evalsW = await getevals(pgn,timepermove=enginetime)
     evalsB = []
     for eval in evalsW:
         evalsB.append(0-eval)
@@ -140,15 +120,15 @@ def getascpl(pgn,enginetime=0.5,max_loss=1000): #Retuns whites acpl, blacks acpl
         cpl = min(evalsB[i]-evalsB[i-1],0)
         if Logging:
             print(evalsB[i],evalsB[i-1],cpl)
-        if cpl < -max_loss:
-            cpl = -max_loss
+        if cpl < -cap:
+            cpl = -cap
         cplsB.append(cpl)
     for i in range(2,len(evalsW)-1,2):
         cpl = min(evalsW[i]-evalsW[i-1],0)
         if Logging:
             print(evalsW[i],evalsW[i-1],cpl)
-        if cpl < -max_loss:
-            cpl = -max_loss
+        if cpl < -cap:
+            cpl = -cap
         cplsW.append(cpl)
     Bsum = 0
     for item in cplsB:
@@ -173,5 +153,8 @@ def getascpl(pgn,enginetime=0.5,max_loss=1000): #Retuns whites acpl, blacks acpl
 
 
     return 0-acplW,0-acplB,cplsW,cplsB
-
-
+'''
+Cur = time.time()
+print(asyncio.run(getascpl(ExamplePGN,enginetime=1)))
+print(time.time()-Cur)
+'''
