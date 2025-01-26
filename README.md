@@ -8,7 +8,7 @@ Input of this function is a PGN, and the time per move an engine spends time thi
 
 Output -> (WhitesACPL, BlacksACPL, list of CPL per move for white, list of CPL peer move for black) 
 
-To test this out, you can try adding print(getacpl(ExamplePGN))
+To test this out, you can try adding print(asyncio.run(getacpl(ExamplePGN)))
 
 # Use of other functions:
 This program contains 3 other functions that the main function (getacpl()) relies on.
